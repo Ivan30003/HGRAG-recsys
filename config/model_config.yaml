@@ -1,0 +1,823 @@
+# ============================================================================
+# H-GRAGrecsys Model Configuration
+# ============================================================================
+# This configuration file contains model-specific settings for the H-GRAGrecsys
+# system as described in the paper "Hybrid Graph Retrieval-Augmented Language
+# Agents for Collaborative Recommendation"
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Agent Configuration (Section 3.2 - Hierarchical Agent Memory Design)
+# ----------------------------------------------------------------------------
+agent:
+  # General agent settings
+  embedding_dim: 1536  # As per paper, using text-embedding-ada-002
+  memory_buffer_size: 10
+  
+  # Hierarchical memory structure (as per paper Section 3.2)
+  hierarchical_memory: true
+  memory_type: "hierarchical"  # "hierarchical" or "flat"
+  
+  # --------------------------------------------------------------------------
+  # Intrinsic Memory (M_int) - Immutable component
+  # --------------------------------------------------------------------------
+  intrinsic_memory:
+    enabled: true
+    immutable: true  # Protected from collaborative updates
+    max_summary_length: 200
+    embedding_dim: 1536
+    
+    # For user agents: demographic info and explicit preferences
+    user_fields:
+      - "user_id"
+      - "demographics"
+      - "explicit_preferences"
+      - "stated_interests"
+    
+    # For item agents: title, category, description
+    item_fields:
+      - "item_id"
+      - "title"
+      - "category"
+      - "description"
+      - "brand"
+    
+    # Text summarization
+    summarization_enabled: true
+    summary_method: "llm"  # "llm" or "extractive"
+  
+  # --------------------------------------------------------------------------
+  # Collaborative Memory (M_col) - Aggregated from neighbors
+  # --------------------------------------------------------------------------
+  collaborative_memory:
+    enabled: true
+    max_neighbors: 50  # Maximum neighbors to aggregate from
+    aggregation_method: "weighted_average"  # "weighted_average", "attention", "max"
+    propagation_hop: 2  # Number of hops for propagation
+    
+    # Fusion parameters (Equation 1)
+    fusion_method: "llm_fuse"  # LLM-based fusion as per paper
+    fusion_temperature: 0.7
+    
+    # Propagation thresholds
+    propagation_signal_threshold: 0.15  # θ_propagate from paper
+    min_propagation_signals: 3
+    
+    # Collaborative patterns
+    pattern_extraction: true
+    max_patterns: 10
+  
+  # --------------------------------------------------------------------------
+  # Interaction Memory (M_inter) - Recent interaction traces
+  # --------------------------------------------------------------------------
+  interaction_memory:
+    enabled: true
+    buffer_size: 10  # k from paper
+    max_traces: 100
+    trace_retention_steps: 1000
+    
+    # Trace fields
+    trace_fields:
+      - "item_id"
+      - "outcome"
+      - "explanation"
+      - "timestamp"
+      - "context"
+    
+    # Memory decay
+    decay_enabled: true
+    decay_rate: 0.01
+    importance_weight: 0.5
+  
+  # --------------------------------------------------------------------------
+  # Reflection Configuration (Section 3.5 - Collaborative Reflection)
+  # --------------------------------------------------------------------------
+  reflection:
+    enabled: true
+    temperature: 0.7
+    max_tokens: 512
+    
+    # Reflection types (Equation 10)
+    reflection_types:
+      - "correct_interaction"
+      - "incorrect_interaction"
+      - "edge_case"
+    
+    # Update rules
+    update_on_correct: true
+    update_on_incorrect: true
+    update_on_edge_case: false
+    
+    # Reflection frequency
+    frequency: 1  # Every interaction
+    batch_reflection: true
+    batch_size: 10
+    
+    # Explanation generation
+    generate_explanation: true
+    explanation_length: 100
+  
+  # --------------------------------------------------------------------------
+  # Memory Consistency (Section 4.5)
+  # --------------------------------------------------------------------------
+  consistency:
+    enabled: true
+    threshold: 0.15  # θ_recompute from paper
+    check_frequency: 10
+    min_similarity: 0.5
+    
+    # Consistency metrics
+    metrics:
+      - "cosine_similarity"
+      - "jaccard_similarity"
+    
+    # Consistency recovery
+    recovery_enabled: true
+    recovery_threshold: 0.3
+    recovery_method: "rollback"  # "rollback" or "reinitialize"
+
+# ----------------------------------------------------------------------------
+# Graph Configuration (Section 3.3 - Heterogeneous Graph Construction)
+# ----------------------------------------------------------------------------
+graph:
+  # --------------------------------------------------------------------------
+  # Graph Structure
+  # --------------------------------------------------------------------------
+  node_types:
+    - "user"
+    - "item"
+  
+  # Relation types (as per paper Section 3.3.1)
+  relation_types:
+    interact:
+      description: "User-Item interaction"
+      bidirectional: true
+      weight_range: [0.0, 1.0]
+    
+    similar_pref:
+      description: "User-User preference similarity"
+      bidirectional: true
+      weight_range: [0.0, 1.0]
+    
+    co_inter:
+      description: "User-User co-interaction"
+      bidirectional: true
+      weight_range: [0.0, 1.0]
+    
+    content_sim:
+      description: "Item-Item content similarity"
+      bidirectional: true
+      weight_range: [0.0, 1.0]
+  
+  # --------------------------------------------------------------------------
+  # User-Item Interaction Edges (E_ui) - Equation 2
+  # --------------------------------------------------------------------------
+  interaction_edges:
+    enabled: true
+    initial_weight: 0.5
+    weight_update_delta: 0.1  # δ from paper
+    weight_clip_min: 0.0
+    weight_clip_max: 1.0
+    
+    # Update rules (Equation 2)
+    update_rules:
+      correct_interaction:
+        delta: 0.1
+        max_weight: 1.0
+      
+      persistent_mismatch:
+        delta: -0.1
+        threshold: 3  # Consecutive mismatches
+    
+    # Pruning (Equation 2)
+    pruning_enabled: true
+    pruning_threshold: 0.05  # ε from paper
+    pruning_frequency: 10  # Steps between pruning
+  
+  # --------------------------------------------------------------------------
+  # User-User Similarity Edges (E_uu) - Equation 3
+  # --------------------------------------------------------------------------
+  user_similarity_edges:
+    enabled: true
+    similarity_threshold: 0.7  # τ_u from paper
+    similarity_metric: "cosine"  # "cosine", "jaccard", "pearson"
+    
+    # Edge weight (Equation 3)
+    weight: "cosine_similarity"
+    min_weight: 0.7
+    max_weight: 1.0
+    
+    # Recompute conditions
+    recompute_on_change: true
+    recompute_threshold: 0.15  # θ_recompute from paper
+    
+    # Embedding for similarity
+    embedding_source: "preference_memory"
+    embedding_dim: 1536
+  
+  # --------------------------------------------------------------------------
+  # User-User Co-interaction Edges (E_co) - Equation 4
+  # --------------------------------------------------------------------------
+  co_interaction_edges:
+    enabled: true
+    min_shared_interactions: 3  # κ from paper
+    similarity_metric: "jaccard"  # As per paper
+    
+    # Edge weight (Jaccard similarity)
+    weight_formula: "|N(ua) ∩ N(ub)| / |N(ua) ∪ N(ub)|"
+    
+    # Recompute frequency
+    recompute_frequency: 10  # Steps
+    
+    # Thresholds
+    min_interactions: 3
+    min_jaccard: 0.1
+  
+  # --------------------------------------------------------------------------
+  # Item-Item Content Similarity Edges (E_ii) - Equation 5
+  # --------------------------------------------------------------------------
+  item_similarity_edges:
+    enabled: true
+    similarity_threshold: 0.6  # τ_i from paper
+    similarity_metric: "cosine"  # As per paper
+    
+    # Edge weight (Equation 5)
+    weight: "cosine_similarity"
+    min_weight: 0.6
+    max_weight: 1.0
+    
+    # Embedding for similarity
+    embedding_source: "intrinsic_memory"
+    embedding_dim: 1536
+    
+    # Recompute conditions
+    recompute_on_change: true
+    recompute_threshold: 0.15  # θ_recompute from paper
+
+  # --------------------------------------------------------------------------
+  # Dynamic Graph Evolution (Section 3.3.2)
+  # --------------------------------------------------------------------------
+  dynamic_graph:
+    enabled: true
+    
+    # Edge weight updates (Equation 7)
+    weight_update_delta: 0.1  # δ from paper
+    weight_update_frequency: 1  # Steps
+    
+    # Edge pruning (Equation 7)
+    pruning_enabled: true
+    pruning_threshold: 0.05  # ε from paper
+    pruning_frequency: 10  # Steps
+    
+    # Similarity edge recomputation
+    recompute_similarity: true
+    recompute_frequency: 10  # Steps
+    recompute_threshold: 0.15  # θ_recompute from paper
+    
+    # New node integration
+    new_node_integration: true
+    initial_similarity_edges: true
+    
+    # Graph statistics
+    track_statistics: true
+    statistics_frequency: 10  # Steps
+
+  # --------------------------------------------------------------------------
+  # PPR Sampling Configuration (Equation 9)
+  # --------------------------------------------------------------------------
+  ppr_sampling:
+    enabled: true
+    restart_prob: 0.15  # As per paper
+    iterations: 100
+    tolerance: 0.001
+    max_nodes: 100
+    
+    # Sampling distribution (Equation 9)
+    easy_threshold: 10  # T_easy from paper
+    hard_threshold: 10  # T_hard from paper
+    
+    # Negative sampling
+    negative_sampling: "hard"  # "hard" or "easy"
+    num_negatives: 99
+
+# ----------------------------------------------------------------------------
+# Graph RAG Configuration (Section 3.4 - Multi-Hop Graph RAG Retrieval)
+# ----------------------------------------------------------------------------
+graph_rag:
+  # --------------------------------------------------------------------------
+  # Retrieval Parameters
+  # --------------------------------------------------------------------------
+  enabled: true
+  max_hops: 2  # k from paper
+  
+  # Context subgraph (Equation 8)
+  context_subgraph:
+    max_nodes: 100
+    max_edges: 500
+    include_metadata: true
+  
+  # --------------------------------------------------------------------------
+  # Metapath Extraction (Section 3.4)
+  # --------------------------------------------------------------------------
+  metapath_extraction:
+    enabled: true
+    
+    # Metapath types (as per paper Section 3.4)
+    metapath_types:
+      user_item_user:
+        description: "u -> i_shared -> u_similar"
+        path: ["user", "item", "user"]
+        max_length: 3
+      
+      user_user_item:
+        description: "u -> u_similar -> i_candidate"
+        path: ["user", "user", "item"]
+        max_length: 3
+      
+      item_item_analogy:
+        description: "i_candidate -> i_similar -> i_history"
+        path: ["item", "item", "item"]
+        max_length: 3
+    
+    # Metapath ranking
+    ranking_method: "importance"  # "importance" or "relevance"
+    max_metapaths: 10
+    
+    # Verbalization
+    verbalize_paths: true
+    verbalization_template: "Path: {path}, Relations: {relations}"
+  
+  # --------------------------------------------------------------------------
+  # Context Construction
+  # --------------------------------------------------------------------------
+  context_constructor:
+    max_context_length: 1024  # For LLM input
+    include_relation_descriptions: true
+    include_node_metadata: true
+    
+    # Context ranking
+    rank_elements: true
+    ranking_method: "relevance"  # "relevance", "importance", "diversity"
+    
+    # Context formats
+    formats:
+      - "textual"
+      - "structured"
+      - "graph"
+    
+    # Format for LLM
+    llm_format: "textual"
+  
+  # --------------------------------------------------------------------------
+  # Retrieval Weights
+  # --------------------------------------------------------------------------
+  retrieval_weights:
+    semantic: 0.5
+    collaborative: 0.5
+    temporal: 0.2
+    popularity: 0.1
+    
+    # Metapath weights
+    metapath_weights:
+      user_item_user: 0.4
+      user_user_item: 0.4
+      item_item_analogy: 0.2
+
+# ----------------------------------------------------------------------------
+# GNN Configuration (Section 3.6 - Component-Disentangled KD)
+# ----------------------------------------------------------------------------
+gnn:
+  # --------------------------------------------------------------------------
+  # Architecture
+  # --------------------------------------------------------------------------
+  hidden_dim: 256
+  num_layers: 3
+  num_heads: 4
+  dropout: 0.1
+  activation: "relu"
+  
+  # Message passing
+  message_passing:
+    type: "heterogeneous"  # "heterogeneous" or "homogeneous"
+    message_dropout: 0.1
+    edge_dropout: 0.1
+    node_dropout: 0.1
+    
+    # Aggregation
+    aggregation: "sum"  # "sum", "mean", "max", "attention"
+    
+  # --------------------------------------------------------------------------
+  # Component Projection Heads (Equations 11-13)
+  # --------------------------------------------------------------------------
+  projection_heads:
+    # Intrinsic projection (Equation 11)
+    intrinsic:
+      enabled: true
+      input_dim: 256
+      output_dim: 256
+      activation: "tanh"
+      num_layers: 2
+    
+    # Collaborative projection (Equation 12)
+    collaborative:
+      enabled: true
+      input_dim: 256
+      output_dim: 256
+      activation: "tanh"
+      num_layers: 2
+    
+    # Interaction projection (Equation 13)
+    interaction:
+      enabled: true
+      input_dim: 256
+      output_dim: 256
+      activation: "tanh"
+      num_layers: 2
+  
+  # --------------------------------------------------------------------------
+  # Attention Module
+  # --------------------------------------------------------------------------
+  attention:
+    enabled: true
+    num_heads: 4
+    attention_dim: 64
+    dropout: 0.1
+    
+    # Attention types
+    types:
+      - "graph_attention"
+      - "path_attention"
+      - "component_attention"
+    
+    # Graph attention (as per paper)
+    graph_attention:
+      enabled: true
+      attention_mechanism: "multi_head"  # "multi_head" or "single_head"
+      negative_slope: 0.2
+    
+    # Path attention
+    path_attention:
+      enabled: true
+      attention_mechanism: "path_aware"
+    
+    # Component attention
+    component_attention:
+      enabled: true
+      attention_mechanism: "component_wise"
+  
+  # --------------------------------------------------------------------------
+  # Training Parameters
+  # --------------------------------------------------------------------------
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  optimizer: "adam"
+  gradient_clip: 1.0
+  
+  # Normalization
+  norm_type: "batch_norm"  # "batch_norm", "layer_norm", "none"
+  norm_momentum: 0.1
+  
+  # Regularization
+  regularization:
+    l1: 0.0
+    l2: 0.00001
+    dropout: 0.1
+
+# ----------------------------------------------------------------------------
+# Distillation Configuration (Section 3.6 - Component-Disentangled KD)
+# ----------------------------------------------------------------------------
+distillation:
+  # --------------------------------------------------------------------------
+  # Distillation Parameters
+  # --------------------------------------------------------------------------
+  enabled: true
+  temperature: 0.07  # τ from paper
+  
+  # --------------------------------------------------------------------------
+  # Loss Components (Equation 14)
+  # --------------------------------------------------------------------------
+  component_wise:
+    enabled: true
+    weight: 1.0  # λ_component from paper
+    loss_type: "mse"  # "mse", "mae", "huber"
+    
+    # Component weights (as per paper)
+    component_weights: [1.0, 1.0, 1.0]  # intrinsic, collaborative, interaction
+  
+  # --------------------------------------------------------------------------
+  # Path Importance Loss (Equation 14 - L_path)
+  # --------------------------------------------------------------------------
+  path_importance:
+    enabled: true
+    weight: 0.5  # α from paper
+    loss_type: "kl_divergence"
+    temperature: 1.0
+    
+    # Path importance extraction
+    extract_from: "attention"  # "attention" or "gradient"
+    normalize: true
+  
+  # --------------------------------------------------------------------------
+  # Contrastive Loss (Equation 15 - L_contrast)
+  # --------------------------------------------------------------------------
+  contrastive:
+    enabled: true
+    weight: 0.3  # β from paper
+    temperature: 0.07  # τ from paper
+    
+    # Contrastive pairs
+    pair_types:
+      - "intra_component"  # Same component across nodes
+      - "inter_component"  # Different components same node
+      - "hard_negative"   # Hard negative mining
+    
+    # Hard negative mining
+    hard_negative_mining: true
+    num_hard_negatives: 10
+  
+  # --------------------------------------------------------------------------
+  # Reconstruction Loss (Equation 15 - L_recon)
+  # --------------------------------------------------------------------------
+  reconstruction:
+    enabled: true
+    weight: 0.2  # γ from paper
+    loss_type: "mse"
+    
+    # Reconstruction target
+    target: "memory"  # "memory", "embedding", "both"
+    
+    # Reconstruction model
+    model_type: "linear"  # "linear", "mlp"
+  
+  # --------------------------------------------------------------------------
+  # Distillation Training
+  # --------------------------------------------------------------------------
+  training:
+    num_epochs: 30
+    batch_size: 64
+    learning_rate: 0.0001
+    
+    # Optimization
+    optimizer: "adam"
+    weight_decay: 0.00001
+    gradient_clip: 1.0
+    
+    # Alignment (as per paper)
+    representation_alignment: true
+    memory_dynamics_transfer: true
+    alignment_iterations: 10
+    alignment_lr: 0.001
+  
+  # --------------------------------------------------------------------------
+  # Knowledge Distiller (Section 3.6)
+  # --------------------------------------------------------------------------
+  knowledge_distiller:
+    enabled: true
+    
+    # Distillation strategies
+    strategies:
+      - "component_alignment"
+      - "path_importance_transfer"
+      - "memory_dynamics_transfer"
+    
+    # Distillation frequency
+    frequency: 1  # Every step
+    
+    # Distillation statistics
+    track_statistics: true
+    statistics_frequency: 10  # Steps
+
+# ----------------------------------------------------------------------------
+# Hybrid Configuration (Section 3.7 - Adaptive Gating)
+# ----------------------------------------------------------------------------
+hybrid:
+  # --------------------------------------------------------------------------
+  # Adaptive Gate (Equation 16)
+  # --------------------------------------------------------------------------
+  gate:
+    enabled: true
+    threshold: 0.3  # η from paper (optimal from Figure 4)
+    
+    # Gate features (Equation 16)
+    features:
+      confidence:
+        enabled: true
+        weight: 1.0
+        description: "GNN prediction entropy"
+      
+      density:
+        enabled: true
+        weight: 0.8
+        description: "Normalized graph degree"
+      
+      criticality:
+        enabled: true
+        weight: 1.2
+        description: "User-facing vs backend decisions"
+      
+      staleness:
+        enabled: true
+        weight: 0.6
+        description: "Time since last text refresh"
+    
+    # Gate parameters (Equation 16)
+    bias: -0.5  # b from equation
+    temperature: 1.0
+    
+    # Gate training
+    trainable: true
+    learning_rate: 0.001
+    optimizer: "adam"
+  
+  # --------------------------------------------------------------------------
+  # Router
+  # --------------------------------------------------------------------------
+  router:
+    enabled: true
+    routing_strategy: "threshold"  # "threshold", "probability", "learned"
+    
+    # Routing decisions
+    decisions:
+      - "gnn"
+      - "llm"
+      - "hybrid"
+    
+    # Routing statistics
+    track_statistics: true
+    statistics_frequency: 10  # Steps
+  
+  # --------------------------------------------------------------------------
+  # Inference Engine
+  # --------------------------------------------------------------------------
+  inference:
+    enabled: true
+    batch_size: 32
+    max_llm_calls_per_batch: 10
+    
+    # Quality-efficiency tradeoff (as per paper)
+    quality_weight: 0.7
+    efficiency_weight: 0.3
+    
+    # Inference paths
+    gnn_path:
+      enabled: true
+      description: "Fast, efficient GNN inference"
+    
+    llm_path:
+      enabled: true
+      description: "Full, high-quality LLM inference"
+    
+    # Fallback
+    fallback:
+      enabled: true
+      fallback_path: "gnn"  # "gnn" or "llm"
+      fallback_threshold: 0.1
+  
+  # --------------------------------------------------------------------------
+  # Gating Analysis (Section 4.6 - Sensitivity to Gate Threshold)
+  # --------------------------------------------------------------------------
+  gating_analysis:
+    enabled: true
+    threshold_range: [0.0, 1.0]
+    threshold_step: 0.05
+    
+    # Analysis metrics
+    metrics:
+      - "quality"
+      - "efficiency"
+      - "cost_savings"
+    
+    # Visualization
+    visualize: true
+    save_plots: true
+
+# ----------------------------------------------------------------------------
+# LLM Integration Configuration
+# ----------------------------------------------------------------------------
+llm:
+  # Model selection
+  model_name: "gpt-3.5-turbo"  # As per paper
+  embedding_model: "text-embedding-ada-002"  # As per paper
+  
+  # Generation parameters
+  temperature: 0.7
+  max_tokens: 512
+  top_p: 0.9
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+  
+  # API configuration
+  api_config:
+    max_retries: 3
+    timeout: 30
+    batch_size: 10
+  
+  # Prompt templates (as per paper Section 3.5)
+  prompts:
+    reflection: |
+      You are a {agent_type} agent in a recommender system.
+      Given the following context and interaction outcome, reflect on your memory.
+      Context: {context}
+      Outcome: {outcome}
+      Provide an explanation and update your memory accordingly.
+    
+    fusion: |
+      You are fusing collaborative memories from multiple agents.
+      Memories: {memories}
+      Instruction: {instruction}
+      Generate a unified collaborative memory.
+    
+    ranking: |
+      You are ranking items for user: {user}
+      Candidate items: {candidates}
+      Context: {context}
+      Rank the items by relevance.
+    
+    explanation: |
+      Provide an explanation for recommending item {item} to user {user}.
+      Context: {context}
+    
+    summarization: |
+      Summarize the following text in {max_length} words or less:
+      {text}
+    
+    metapath_verbalization: |
+      Describe the relationship path: {path}
+      Relation types: {relations}
+    
+    system_reflection: |
+      You are a collaborative reflection engine for a recommender system.
+      Analyze the interaction and provide insights.
+    
+    system_fusion: |
+      You are a memory fusion engine for a recommender system.
+      Combine multiple memories into a coherent representation.
+    
+    system_ranking: |
+      You are a ranking expert for a recommender system.
+      Rank items based on user preferences and context.
+
+# ============================================================================
+# Model Variants (for ablation studies)
+# ============================================================================
+model_variants:
+  # Full model (GraphRAG-Hybrid)
+  full:
+    description: "Full three-phase pipeline with adaptive gating"
+    hierarchical_memory: true
+    graph_rag: true
+    distillation: true
+    adaptive_gating: true
+  
+  # LLM only (GraphRAG-Base)
+  llm_only:
+    description: "Bootstrap phase only (LLM path, no distillation)"
+    hierarchical_memory: true
+    graph_rag: true
+    distillation: false
+    adaptive_gating: false
+  
+  # GNN only (GraphRAG-Emb)
+  gnn_only:
+    description: "Full distillation, GNN path only"
+    hierarchical_memory: true
+    graph_rag: true
+    distillation: true
+    adaptive_gating: false
+  
+  # Flat memory (ablation)
+  flat_memory:
+    description: "Flat memory structure (no hierarchy)"
+    hierarchical_memory: false
+    graph_rag: true
+    distillation: true
+    adaptive_gating: true
+  
+  # No Graph RAG (ablation)
+  no_graph_rag:
+    description: "No Graph RAG retrieval"
+    hierarchical_memory: true
+    graph_rag: false
+    distillation: true
+    adaptive_gating: true
+  
+  # No distillation (ablation)
+  no_distillation:
+    description: "No GNN distillation"
+    hierarchical_memory: true
+    graph_rag: true
+    distillation: false
+    adaptive_gating: true
+  
+  # No adaptive gating (ablation)
+  no_gating:
+    description: "No adaptive gating (uniform 15% LLM)"
+    hierarchical_memory: true
+    graph_rag: true
+    distillation: true
+    adaptive_gating: false
+    uniform_llm_rate: 0.15
+
+# ============================================================================
+# End of Model Configuration
+# ============================================================================

@@ -1,0 +1,597 @@
+# ============================================================================
+# H-GRAGrecsys Training Configuration
+# ============================================================================
+# This configuration file contains training-specific settings for the H-GRAGrecsys
+# system as described in the paper "Hybrid Graph Retrieval-Augmented Language
+# Agents for Collaborative Recommendation"
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Phase 1: Bootstrap Training (Section 3.5 - Collaborative Reflection)
+# ----------------------------------------------------------------------------
+phase1:
+  description: "Bootstrap agents with LLM reflections"
+  
+  # Training parameters
+  num_epochs: 50
+  batch_size: 32
+  learning_rate: 0.0001
+  
+  # Optimization
+  optimizer: "adam"
+  weight_decay: 0.00001
+  gradient_clip: 1.0
+  scheduler: "cosine"  # "cosine", "step", "plateau"
+  scheduler_params:
+    warmup_steps: 1000
+    min_lr: 0.000001
+  
+  # --------------------------------------------------------------------------
+  # Collaborative Reflection (Section 3.5)
+  # --------------------------------------------------------------------------
+  reflection:
+    # Easy/hard thresholds (Equation 9)
+    easy_threshold: 10   # T_easy from paper
+    hard_threshold: 10   # T_hard from paper
+    
+    # Reflection frequency
+    reflection_interval: 1  # Every interaction
+    batch_reflection: true
+    batch_size: 10
+    
+    # Propagation (Equation 10)
+    propagation_signal_threshold: 0.15  # θ_propagate from paper
+    propagation_hop: 2
+    max_propagation_nodes: 50
+    
+    # Negative sampling (Equation 9)
+    negative_sampling:
+      strategy: "hard"  # "hard" or "easy"
+      num_negatives: 1  # One hard negative per positive
+    
+    # Memory updates (Equation 10)
+    memory_update:
+      enabled: true
+      update_interval: 1
+      consistency_check: true
+  
+  # --------------------------------------------------------------------------
+  # Bootstrap Data (Section 3.1)
+  # --------------------------------------------------------------------------
+  data:
+    num_users: 500  # As per paper (Phase 1 only)
+    min_interactions: 5
+    max_interactions: 100
+    
+    # Data subsets
+    subsets:
+      - "full"      # 500 users, all interactions
+      - "dense"     # 100 users, dense interactions
+      - "sparse"    # 100 users, sparse interactions
+  
+  # --------------------------------------------------------------------------
+  # Agent Initialization
+  # --------------------------------------------------------------------------
+  agent_initialization:
+    method: "profile_based"  # "profile_based" or "random"
+    
+    # User profile creation
+    user_profile:
+      use_interactions: true
+      use_demographics: true
+      use_explicit_preferences: true
+    
+    # Item profile creation
+    item_profile:
+      use_metadata: true
+      use_descriptions: true
+      use_categories: true
+  
+  # --------------------------------------------------------------------------
+  # Checkpointing
+  # --------------------------------------------------------------------------
+  checkpointing:
+    save_interval: 5  # Save every N epochs
+    save_best: true
+    save_last: true
+    max_checkpoints: 10
+    
+    # Early stopping
+    early_stopping:
+      enabled: true
+      patience: 10  # Steps
+      threshold: 0.001
+      metric: "ndcg@10"
+      mode: "max"  # "max" or "min"
+  
+  # --------------------------------------------------------------------------
+  # Logging and Monitoring
+  # --------------------------------------------------------------------------
+  logging:
+    log_interval: 10  # Batch interval
+    log_metrics: true
+    log_memory: true
+    log_graph: true
+    log_reflections: true
+    
+    # Tensorboard
+    tensorboard:
+      enabled: true
+      log_dir: "logs/tensorboard/phase1"
+  
+  # --------------------------------------------------------------------------
+  # Evaluation During Training
+  # --------------------------------------------------------------------------
+  evaluation:
+    eval_interval: 5  # Epochs
+    eval_metrics:
+      - "ndcg@10"
+      - "hit_rate@10"
+      - "recall@10"
+      - "loss"
+    
+    # Validation data
+    validation:
+      use_validation_set: true
+      val_frequency: 1
+
+# ----------------------------------------------------------------------------
+# Phase 2: Distillation Training (Section 3.6 - Component-Disentangled KD)
+# ----------------------------------------------------------------------------
+phase2:
+  description: "Distill knowledge from LLM to GNN"
+  
+  # Training parameters
+  num_epochs: 30
+  batch_size: 64
+  learning_rate: 0.0001
+  
+  # Optimization
+  optimizer: "adam"
+  weight_decay: 0.00001
+  gradient_clip: 1.0
+  scheduler: "cosine"
+  scheduler_params:
+    warmup_steps: 500
+    min_lr: 0.000001
+  
+  # --------------------------------------------------------------------------
+  # Distillation Loss (Equation 14-15)
+  # --------------------------------------------------------------------------
+  distillation_loss:
+    # Component-wise loss (Equation 14 - L_component)
+    component_wise:
+      enabled: true
+      weight: 1.0  # λ_component
+      loss_type: "mse"  # "mse", "mae", "huber"
+      
+      # Component weights (as per paper)
+      component_weights:
+        intrinsic: 1.0
+        collaborative: 1.0
+        interaction: 1.0
+    
+    # Path importance loss (Equation 14 - L_path)
+    path_importance:
+      enabled: true
+      weight: 0.5  # α from paper
+      loss_type: "kl_divergence"
+      temperature: 1.0
+      
+      # Attention extraction
+      attention_extraction:
+        method: "gradient"  # "gradient" or "attention"
+        normalize: true
+    
+    # Contrastive loss (Equation 15 - L_contrast)
+    contrastive:
+      enabled: true
+      weight: 0.3  # β from paper
+      temperature: 0.07  # τ from paper
+      
+      # Contrastive pairs
+      pair_types:
+        - "intra_component"   # Same component across nodes
+        - "inter_component"   # Different components same node
+        - "hard_negative"     # Hard negative mining
+      
+      hard_negative_mining:
+        enabled: true
+        num_hard_negatives: 10
+        mining_strategy: "semi_hard"
+    
+    # Reconstruction loss (Equation 15 - L_recon)
+    reconstruction:
+      enabled: true
+      weight: 0.2  # γ from paper
+      loss_type: "mse"
+      target: "memory"  # "memory", "embedding", "both"
+      
+      # Reconstruction model
+      model:
+        type: "linear"  # "linear", "mlp"
+        hidden_dim: 128
+        num_layers: 2
+  
+  # --------------------------------------------------------------------------
+  # Knowledge Distillation
+  # --------------------------------------------------------------------------
+  distillation:
+    # Teacher-student alignment
+    representation_alignment: true
+    memory_dynamics_transfer: true
+    
+    # Alignment parameters
+    alignment:
+      iterations: 10
+      learning_rate: 0.001
+      method: "projection"  # "projection", "regression"
+    
+    # Distillation schedule
+    schedule:
+      start_step: 0
+      frequency: 1  # Every step
+      temperature_annealing: true
+      initial_temperature: 1.0
+      final_temperature: 0.07
+    
+    # Distillation statistics
+    statistics:
+      enabled: true
+      frequency: 10  # Steps
+      metrics:
+        - "component_alignment"
+        - "path_importance_kl"
+        - "contrastive_loss"
+        - "reconstruction_loss"
+  
+  # --------------------------------------------------------------------------
+  # Student GNN Training (Section 3.6)
+  # --------------------------------------------------------------------------
+  gnn_training:
+    # Model architecture
+    architecture:
+      hidden_dim: 256
+      num_layers: 3
+      num_heads: 4
+      dropout: 0.1
+    
+    # Component projection heads (Equations 11-13)
+    projection_heads:
+      intrinsic:
+        dim: 256
+        activation: "tanh"
+      collaborative:
+        dim: 256
+        activation: "tanh"
+      interaction:
+        dim: 256
+        activation: "tanh"
+    
+    # Training
+    gradient_clip: 1.0
+    gradient_accumulation_steps: 2
+    
+    # Regularization
+    regularization:
+      l2_weight: 0.00001
+      dropout: 0.1
+      early_stopping: true
+  
+  # --------------------------------------------------------------------------
+  # Data Preparation
+  # --------------------------------------------------------------------------
+  data_preparation:
+    # Training data from reflections
+    reflection_traces:
+      use_all_traces: true
+      max_traces: 10000
+      min_trace_length: 3
+    
+    # Negative sampling
+    negative_sampling:
+      num_negatives: 99
+      strategy: "hard"  # "hard" or "random"
+    
+    # Data augmentation
+    augmentation:
+      enabled: false
+      methods: []
+  
+  # --------------------------------------------------------------------------
+  # Checkpointing
+  # --------------------------------------------------------------------------
+  checkpointing:
+    save_interval: 5
+    save_best: true
+    save_last: true
+    max_checkpoints: 10
+    
+    early_stopping:
+      enabled: true
+      patience: 10
+      threshold: 0.001
+      metric: "ndcg@10"
+      mode: "max"
+  
+  # --------------------------------------------------------------------------
+  # Logging and Monitoring
+  # --------------------------------------------------------------------------
+  logging:
+    log_interval: 10
+    log_metrics: true
+    log_loss_components: true
+    
+    # Tensorboard
+    tensorboard:
+      enabled: true
+      log_dir: "logs/tensorboard/phase2"
+
+# ----------------------------------------------------------------------------
+# Phase 3: Hybrid Training (Section 3.7 - Adaptive Gating)
+# ----------------------------------------------------------------------------
+phase3:
+  description: "Hybrid inference with adaptive gating"
+  
+  # Training parameters
+  num_epochs: 20
+  batch_size: 32
+  learning_rate: 0.00005
+  
+  # Optimization
+  optimizer: "adam"
+  weight_decay: 0.00001
+  gradient_clip: 1.0
+  scheduler: "cosine"
+  scheduler_params:
+    warmup_steps: 500
+    min_lr: 0.000005
+  
+  # --------------------------------------------------------------------------
+  # Adaptive Gating (Equation 16)
+  # --------------------------------------------------------------------------
+  gating:
+    # Gate parameters (Equation 16)
+    gate_threshold: 0.3  # η from paper (optimal from Figure 4)
+    gate_bias: -0.5  # b from equation
+    gate_temperature: 1.0
+    
+    # Gate features (Equation 16)
+    features:
+      confidence:
+        enabled: true
+        weight: 1.0
+        description: "GNN prediction entropy"
+      
+      density:
+        enabled: true
+        weight: 0.8
+        description: "Normalized graph degree"
+      
+      criticality:
+        enabled: true
+        weight: 1.2
+        description: "User-facing vs backend decisions"
+      
+      staleness:
+        enabled: true
+        weight: 0.6
+        description: "Time since last text refresh"
+        lambda: 0.1  # λ from paper
+    
+    # Gate training
+    trainable: true
+    learning_rate: 0.001
+    optimizer: "adam"
+    
+    # Threshold optimization (Section 4.6)
+    threshold_optimization:
+      enabled: true
+      steps: 100
+      range: [0.0, 1.0]
+      step_size: 0.05
+      metric: "quality_cost"  # "quality_cost", "quality", "efficiency"
+      quality_weight: 0.7
+      efficiency_weight: 0.3
+  
+  # --------------------------------------------------------------------------
+  # Hybrid Inference (Section 3.7)
+  # --------------------------------------------------------------------------
+  inference:
+    # Inference paths
+    gnn_path:
+      enabled: true
+      description: "Fast, efficient GNN inference"
+      max_batch_size: 128
+    
+    llm_path:
+      enabled: true
+      description: "Full, high-quality LLM inference"
+      max_batch_size: 16
+      max_llm_calls: 10
+    
+    # Routing strategy
+    routing:
+      strategy: "adaptive"  # "adaptive", "uniform", "threshold"
+      uniform_llm_rate: 0.15  # For baseline comparison
+    
+    # Quality-efficiency tradeoff
+    tradeoff:
+      quality_weight: 0.7
+      efficiency_weight: 0.3
+      
+      # Pareto optimization
+      pareto_optimization:
+        enabled: true
+        num_points: 20
+  
+  # --------------------------------------------------------------------------
+  # Model Loading
+  # --------------------------------------------------------------------------
+  model_loading:
+    # Load GNN from Phase 2
+    gnn_model:
+      path: null  # Will be set during training
+      required: true
+    
+    # Load LLM from Phase 1
+    llm_model:
+      path: null  # Will be set during training
+      required: true
+  
+  # --------------------------------------------------------------------------
+  # Checkpointing
+  # --------------------------------------------------------------------------
+  checkpointing:
+    save_interval: 5
+    save_best: true
+    save_last: true
+    max_checkpoints: 10
+    
+    early_stopping:
+      enabled: true
+      patience: 10
+      threshold: 0.001
+      metric: "ndcg@10"
+      mode: "max"
+  
+  # --------------------------------------------------------------------------
+  # Logging and Monitoring
+  # --------------------------------------------------------------------------
+  logging:
+    log_interval: 10
+    log_gate_decisions: true
+    log_routing_stats: true
+    
+    # Tensorboard
+    tensorboard:
+      enabled: true
+      log_dir: "logs/tensorboard/phase3"
+
+# ----------------------------------------------------------------------------
+# Global Training Settings
+# ----------------------------------------------------------------------------
+global:
+  # Device configuration
+  device: "cuda"  # "cuda" or "cpu"
+  gpu_id: 0
+  
+  # Mixed precision training
+  use_amp: false  # Automatic Mixed Precision
+  
+  # Distributed training
+  distributed:
+    enabled: false
+    backend: "nccl"
+    world_size: 1
+  
+  # Random seed
+  seed: 42
+  
+  # Logging
+  log_level: "INFO"
+  log_dir: "logs"
+  
+  # Checkpoint directory
+  checkpoint_dir: "checkpoints"
+  
+  # Model export
+  export_format: ["pt", "pkl"]
+  export_quantization: false
+
+# ----------------------------------------------------------------------------
+# Training Schedules
+# ----------------------------------------------------------------------------
+schedules:
+  # Phase 1 schedule
+  phase1_schedule:
+    - epochs: 20
+      learning_rate: 0.0001
+      batch_size: 32
+    
+    - epochs: 15
+      learning_rate: 0.00005
+      batch_size: 32
+    
+    - epochs: 15
+      learning_rate: 0.00001
+      batch_size: 64
+  
+  # Phase 2 schedule
+  phase2_schedule:
+    - epochs: 10
+      learning_rate: 0.0001
+      temperature: 1.0
+    
+    - epochs: 10
+      learning_rate: 0.00005
+      temperature: 0.5
+    
+    - epochs: 10
+      learning_rate: 0.00001
+      temperature: 0.07  # τ from paper
+  
+  # Phase 3 schedule
+  phase3_schedule:
+    - epochs: 5
+      learning_rate: 0.00005
+      gate_lr: 0.001
+    
+    - epochs: 10
+      learning_rate: 0.00001
+      gate_lr: 0.0005
+    
+    - epochs: 5
+      learning_rate: 0.000005
+      gate_lr: 0.0001
+
+# ----------------------------------------------------------------------------
+# Hyperparameter Search (for optimization)
+# ----------------------------------------------------------------------------
+hyperparameter_search:
+  enabled: false
+  
+  # Search parameters
+  phase1:
+    learning_rate: [0.0001, 0.00005, 0.00001]
+    batch_size: [16, 32, 64]
+    num_epochs: [30, 50, 70]
+  
+  phase2:
+    alpha: [0.3, 0.5, 0.7]  # Path importance weight
+    beta: [0.1, 0.3, 0.5]   # Contrastive weight
+    gamma: [0.1, 0.2, 0.3]  # Reconstruction weight
+    temperature: [0.05, 0.07, 0.1]
+  
+  phase3:
+    gate_threshold: [0.2, 0.3, 0.4, 0.5]
+    quality_weight: [0.5, 0.7, 0.9]
+    efficiency_weight: [0.1, 0.3, 0.5]
+
+# ----------------------------------------------------------------------------
+# Experiment Tracking
+# ----------------------------------------------------------------------------
+experiment_tracking:
+  # Weights & Biases
+  wandb:
+    enabled: false
+    project: "h-gragrecsys"
+    entity: null
+    tags: []
+  
+  # MLflow
+  mlflow:
+    enabled: false
+    tracking_uri: null
+    experiment_name: "h-gragrecsys"
+  
+  # Local tracking
+  local:
+    enabled: true
+    log_dir: "experiments"
+    save_configs: true
+    save_models: true
+
+# ============================================================================
+# End of Training Configuration
+# ============================================================================

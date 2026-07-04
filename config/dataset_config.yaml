@@ -1,0 +1,531 @@
+# ============================================================================
+# H-GRAGrecsys Dataset Configuration
+# ============================================================================
+# This configuration file contains dataset-specific settings for the H-GRAGrecsys
+# system as described in the paper "Hybrid Graph Retrieval-Augmented Language
+# Agents for Collaborative Recommendation"
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Available Datasets (as per paper Section 3.1)
+# ----------------------------------------------------------------------------
+datasets:
+  # Amazon CDs and Vinyl Dataset
+  Amazon_CDs_Vinyl:
+    name: "Amazon CDs and Vinyl"
+    description: "CDs and Vinyl category from Amazon review dataset"
+    source: "Amazon"
+    category: "CDs_Vinyl"
+    
+    # Dataset statistics (as per paper Table 1)
+    statistics:
+      full:
+        users: 500
+        items: 5234
+        interactions: 12847
+        sparsity: 99.51
+        avg_words: 8.04
+      
+      dense_subset:
+        users: 100
+        items: 269
+        interactions: 800
+        sparsity: 97.03
+        avg_words: 8.47
+      
+      sparse_subset:
+        users: 100
+        items: 704
+        interactions: 800
+        sparsity: 98.86
+        avg_words: 7.76
+    
+    # File paths
+    paths:
+      raw: "data/raw/amazon/CDs_and_Vinyl"
+      processed: "data/processed/amazon/CDs_and_Vinyl"
+      cache: "data/cache/amazon/CDs_and_Vinyl"
+      
+      # Specific files
+      reviews: "reviews.json.gz"
+      metadata: "metadata.json.gz"
+      categories: "categories.txt"
+    
+    # Preprocessing parameters
+    preprocessing:
+      max_text_length: 512
+      min_token_freq: 5
+      min_interactions: 5
+      max_users: 500
+      
+      # Text fields
+      text_fields:
+        - "reviewText"
+        - "summary"
+        - "title"
+        - "description"
+      
+      # Metadata fields
+      metadata_fields:
+        - "title"
+        - "description"
+        - "categories"
+        - "brand"
+        - "price"
+        - "rating"
+        - "review_count"
+      
+      # Rating threshold for positive interactions
+      rating_threshold: 3.0
+    
+    # Split configuration
+    splits:
+      train_ratio: 0.7
+      validation_ratio: 0.1
+      test_ratio: 0.2
+      
+      # Seed for reproducible splits
+      seed: 42
+    
+    # Sampling configurations (for dense/sparse subsets)
+    sampling:
+      dense:
+        users: 100
+        density: 0.0297  # 1 - 97.03% sparsity
+        min_interactions: 3
+      
+      sparse:
+        users: 100
+        density: 0.0114  # 1 - 98.86% sparsity
+        min_interactions: 1
+    
+    # Feature extraction
+    features:
+      text_embedding_dim: 1536
+      text_encoder: "text-embedding-ada-002"
+      
+      # Feature types
+      feature_types:
+        - "textual"
+        - "categorical"
+        - "numerical"
+      
+      # Normalization
+      normalize_features: true
+      normalization_method: "z_score"  # "z_score" or "min_max"
+    
+    # Validation configuration
+    validation:
+      split_size: 0.1
+      seed: 42
+      shuffle: true
+
+  # Amazon Office Products Dataset
+  Amazon_Office_Products:
+    name: "Amazon Office Products"
+    description: "Office Products category from Amazon review dataset"
+    source: "Amazon"
+    category: "Office_Products"
+    
+    # Dataset statistics (as per paper Table 1)
+    statistics:
+      full:
+        users: 500
+        items: 3891
+        interactions: 9562
+        sparsity: 99.49
+        avg_words: 25.14
+      
+      dense_subset:
+        users: 100
+        items: 188
+        interactions: 600
+        sparsity: 96.81
+        avg_words: 25.48
+      
+      sparse_subset:
+        users: 100
+        items: 561
+        interactions: 600
+        sparsity: 98.93
+        avg_words: 25.06
+    
+    # File paths
+    paths:
+      raw: "data/raw/amazon/Office_Products"
+      processed: "data/processed/amazon/Office_Products"
+      cache: "data/cache/amazon/Office_Products"
+      
+      # Specific files
+      reviews: "reviews.json.gz"
+      metadata: "metadata.json.gz"
+      categories: "categories.txt"
+    
+    # Preprocessing parameters
+    preprocessing:
+      max_text_length: 512
+      min_token_freq: 5
+      min_interactions: 5
+      max_users: 500
+      
+      # Text fields
+      text_fields:
+        - "reviewText"
+        - "summary"
+        - "title"
+        - "description"
+      
+      # Metadata fields
+      metadata_fields:
+        - "title"
+        - "description"
+        - "categories"
+        - "brand"
+        - "price"
+        - "rating"
+        - "review_count"
+      
+      # Rating threshold for positive interactions
+      rating_threshold: 3.0
+    
+    # Split configuration
+    splits:
+      train_ratio: 0.7
+      validation_ratio: 0.1
+      test_ratio: 0.2
+      
+      # Seed for reproducible splits
+      seed: 42
+    
+    # Sampling configurations (for dense/sparse subsets)
+    sampling:
+      dense:
+        users: 100
+        density: 0.0319  # 1 - 96.81% sparsity
+        min_interactions: 3
+      
+      sparse:
+        users: 100
+        density: 0.0107  # 1 - 98.93% sparsity
+        min_interactions: 1
+    
+    # Feature extraction
+    features:
+      text_embedding_dim: 1536
+      text_encoder: "text-embedding-ada-002"
+      
+      # Feature types
+      feature_types:
+        - "textual"
+        - "categorical"
+        - "numerical"
+      
+      # Normalization
+      normalize_features: true
+      normalization_method: "z_score"
+    
+    # Validation configuration
+    validation:
+      split_size: 0.1
+      seed: 42
+      shuffle: true
+
+# ----------------------------------------------------------------------------
+# Default Dataset Configuration
+# ----------------------------------------------------------------------------
+default_dataset: "Amazon_CDs_Vinyl"
+
+# ----------------------------------------------------------------------------
+# Global Data Settings
+# ----------------------------------------------------------------------------
+data_settings:
+  # Data directories
+  base_dir: "data"
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  cache_dir: "data/cache"
+  logs_dir: "data/logs"
+  
+  # File formats
+  formats:
+    raw: "json.gz"
+    processed: "pkl"
+    cache: "pkl"
+    
+  # Compression
+  compression:
+    raw: "gzip"
+    processed: "pickle"
+  
+  # Text processing
+  text_processing:
+    max_length: 512
+    min_token_freq: 5
+    max_vocab_size: 50000
+    
+    # Stop words
+    remove_stopwords: true
+    custom_stopwords:
+      - "the"
+      - "a"
+      - "an"
+      - "and"
+      - "or"
+      - "but"
+      - "for"
+      - "nor"
+      - "on"
+      - "at"
+      - "to"
+      - "by"
+      - "with"
+      - "without"
+    
+    # Text cleaning
+    clean_text: true
+    lowercase: true
+    remove_html: true
+    remove_emojis: true
+    remove_urls: true
+    remove_mentions: true
+    remove_hashtags: true
+  
+  # Feature engineering
+  feature_engineering:
+    # Text features
+    text_features:
+      - "tfidf"
+      - "word_count"
+      - "char_count"
+      - "avg_word_length"
+    
+    # Metadata features
+    metadata_features:
+      - "category_count"
+      - "brand_frequency"
+      - "price_range"
+    
+    # Interaction features
+    interaction_features:
+      - "user_item_count"
+      - "item_popularity"
+      - "user_activity"
+  
+  # User/Item filtering
+  filtering:
+    min_user_interactions: 5
+    min_item_interactions: 5
+    max_user_interactions: 1000
+    max_item_interactions: 1000
+    
+    # Cold-start filtering
+    cold_start:
+      min_interactions: 0
+      max_interactions: 10
+
+# ----------------------------------------------------------------------------
+# Dataset Evaluation Configurations (as per paper Section 3.1)
+# ----------------------------------------------------------------------------
+evaluation_subsets:
+  # For Phase 1 bootstrap (500 users as per paper)
+  phase1_bootstrap:
+    users: 500
+    min_interactions: 5
+    max_interactions: 100
+    random_seed: 42
+  
+  # For evaluation (100 users as per paper)
+  evaluation:
+    users: 100
+    random_seed: 42
+  
+  # Dense subset (as per paper Table 1)
+  dense:
+    users: 100
+    density_level: "high"
+    min_interactions: 3
+  
+  # Sparse subset (as per paper Table 1)
+  sparse:
+    users: 100
+    density_level: "low"
+    min_interactions: 1
+
+# ----------------------------------------------------------------------------
+# Data Loader Configuration
+# ----------------------------------------------------------------------------
+data_loader:
+  # Batch settings
+  batch_size: 32
+  shuffle: true
+  drop_last: false
+  num_workers: 4
+  pin_memory: true
+  
+  # Sampling
+  sampling_strategy: "random"  # "random", "stratified", "sequential"
+  
+  # Negative sampling (as per paper Section 3.8)
+  negative_sampling:
+    num_negatives: 99  # As per paper
+    strategy: "random"  # "random", "hard", "popular"
+    
+  # Data augmentation
+  augmentation:
+    enabled: false
+    strategies: []
+  
+  # Caching
+  cache_batches: true
+  cache_size: 100
+
+# ----------------------------------------------------------------------------
+# Text Encoder Configuration
+# ----------------------------------------------------------------------------
+text_encoder:
+  model_name: "text-embedding-ada-002"  # As per paper
+  embedding_dim: 1536
+  max_tokens: 8192
+  
+  # Batch processing
+  batch_size: 64
+  show_progress: true
+  
+  # Cache embeddings
+  cache_embeddings: true
+  cache_dir: "data/cache/embeddings"
+
+# ----------------------------------------------------------------------------
+# Amazon Dataset Specific Configuration
+# ----------------------------------------------------------------------------
+amazon:
+  # Data files
+  files:
+    reviews: "reviews.json.gz"
+    metadata: "metadata.json.gz"
+    categories: "categories.txt"
+    product_graph: "product_graph.json"
+  
+  # Review fields
+  review_fields:
+    - "reviewerID"
+    - "asin"
+    - "reviewText"
+    - "summary"
+    - "overall"
+    - "unixReviewTime"
+    - "reviewTime"
+    - "verified"
+  
+  # Metadata fields
+  metadata_fields:
+    - "asin"
+    - "title"
+    - "description"
+    - "brand"
+    - "categories"
+    - "price"
+    - "rating"
+    - "review_count"
+  
+  # Filtering
+  filter:
+    min_rating: 3.0
+    min_reviews: 5
+    min_metadata_words: 10
+  
+  # Sampling (as per paper)
+  sample:
+    dense_users: 100
+    sparse_users: 100
+    full_users: 500
+
+# ----------------------------------------------------------------------------
+# MovieLens Dataset Configuration (for future extension)
+# ----------------------------------------------------------------------------
+movielens:
+  versions:
+    - "100K"
+    - "1M"
+    - "10M"
+    - "20M"
+  
+  files:
+    100K:
+      ratings: "u.data"
+      users: "u.user"
+      items: "u.item"
+    1M:
+      ratings: "ratings.dat"
+      users: "users.dat"
+      movies: "movies.dat"
+    10M:
+      ratings: "ratings.dat"
+      movies: "movies.dat"
+      tags: "tags.dat"
+  
+  # Fields
+  fields:
+    ratings: ["user_id", "item_id", "rating", "timestamp"]
+    users: ["user_id", "age", "gender", "occupation", "zip_code"]
+    items: ["item_id", "title", "genres"]
+  
+  # Filtering
+  filter:
+    min_rating: 3.0
+    min_ratings: 5
+    min_items: 5
+
+# ----------------------------------------------------------------------------
+# Yelp Dataset Configuration (for future extension)
+# ----------------------------------------------------------------------------
+yelp:
+  files:
+    business: "business.json"
+    review: "review.json"
+    user: "user.json"
+    checkin: "checkin.json"
+    tip: "tip.json"
+  
+  # Fields
+  fields:
+    business: ["business_id", "name", "categories", "stars", "review_count"]
+    review: ["review_id", "user_id", "business_id", "stars", "text", "date"]
+    user: ["user_id", "name", "review_count", "yelping_since", "fans"]
+  
+  # Filtering
+  filter:
+    min_stars: 3.0
+    min_reviews: 5
+    min_users: 100
+    min_businesses: 100
+
+# ----------------------------------------------------------------------------
+# LastFM Dataset Configuration (for future extension)
+# ----------------------------------------------------------------------------
+lastfm:
+  files:
+    users: "users.dat"
+    artists: "artists.dat"
+    tags: "tags.dat"
+    user_artists: "user_artists.dat"
+    user_friends: "user_friends.dat"
+    user_taggedartists: "user_taggedartists.dat"
+    user_taggedartists_timestamps: "user_taggedartists_timestamps.dat"
+  
+  # Fields
+  fields:
+    users: ["user_id", "name"]
+    artists: ["artist_id", "name"]
+    tags: ["tag_id", "value"]
+    user_artists: ["user_id", "artist_id", "weight"]
+  
+  # Filtering
+  filter:
+    min_plays: 10
+    min_artists: 5
+    min_users: 100
+
+# ============================================================================
+# End of Dataset Configuration
+# ============================================================================

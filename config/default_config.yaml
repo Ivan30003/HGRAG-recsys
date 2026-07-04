@@ -1,0 +1,702 @@
+# ============================================================================
+# H-GRAGrecsys Default Configuration
+# ============================================================================
+# This configuration file contains all settings for the H-GRAGrecsys system
+# as described in the paper "Hybrid Graph Retrieval-Augmented Language Agents
+# for Collaborative Recommendation"
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# Experiment Configuration
+# ----------------------------------------------------------------------------
+experiment:
+  name: "h_grag_recsys"
+  description: "Hybrid Graph Retrieval-Augmented Language Agents for Collaborative Recommendation"
+  seed: 42
+  device: "cuda"  # "cuda" or "cpu"
+  debug: false
+  version: "1.0.0"
+
+# ----------------------------------------------------------------------------
+# Data Configuration
+# ----------------------------------------------------------------------------
+data:
+  dataset_name: "Amazon_CDs_Vinyl"  # Options: Amazon_CDs_Vinyl, Amazon_Office_Products
+  data_dir: "data/raw"
+  processed_dir: "data/processed"
+  cache_dir: "data/cache"
+  
+  # Dataset sampling parameters (as per paper: 100 users for evaluation, 500 for Phase 1)
+  sample_size: 0  # 0 = no sampling, use full dataset
+  density: 1.0    # 1.0 = full density, <1.0 = sparse subset
+  
+  # Text processing
+  max_text_length: 512
+  min_token_freq: 5
+  vocab_size: 50000
+  
+  # Split ratios (train/val/test)
+  train_ratio: 0.7
+  validation_ratio: 0.1
+  test_ratio: 0.2
+  
+  # User/item filtering
+  min_interactions: 5
+  max_users: 500  # For Phase 1 bootstrap
+  eval_users: 100  # For evaluation (as per paper)
+  
+  # Text encoder
+  text_encoder: "text-embedding-ada-002"  # As specified in paper
+  embedding_dim: 1536  # As specified in paper
+
+# ----------------------------------------------------------------------------
+# Model Configuration
+# ----------------------------------------------------------------------------
+model:
+  # --------------------------------------------------------------------------
+  # Agent Configuration (Section 3.2 - Hierarchical Agent Memory Design)
+  # --------------------------------------------------------------------------
+  agent:
+    # Memory configuration
+    memory_buffer_size: 10
+    embedding_dim: 1536
+    consistency_threshold: 0.15  # θ_recompute from paper
+    
+    # Hierarchical memory components (as per paper Section 3.2)
+    hierarchical_memory: true
+    memory_type: "hierarchical"  # "hierarchical" or "flat"
+    
+    # Intrinsic memory (immutable)
+    intrinsic_memory:
+      enabled: true
+      immutable: true
+      max_summary_length: 200
+    
+    # Collaborative memory (aggregated from neighbors)
+    collaborative_memory:
+      enabled: true
+      propagation_threshold: 0.15  # θ_propagate
+      max_neighbors: 50
+    
+    # Interaction memory (recent traces)
+    interaction_memory:
+      enabled: true
+      buffer_size: 10
+      max_traces: 100
+    
+    # Reflection configuration
+    reflection_enabled: true
+    reflection_temperature: 0.7
+    
+    # Learning parameters
+    learning_rate: 0.0001
+    
+    # Similarity thresholds (as per paper Section 3.3.1)
+    user_similarity_threshold: 0.7  # τ_u
+    item_similarity_threshold: 0.6  # τ_i
+    co_interaction_threshold: 3     # κ
+  
+  # --------------------------------------------------------------------------
+  # Graph Configuration (Section 3.3 - Heterogeneous Graph Construction)
+  # --------------------------------------------------------------------------
+  graph:
+    # Graph structure
+    edge_update_rate: 0.1  # δ from paper
+    pruning_threshold: 0.05  # ε from paper
+    max_hops: 2  # k from paper
+    
+    # Relation types (as per paper Section 3.3.1)
+    relation_types:
+      - "interact"
+      - "similar_pref"
+      - "co_inter"
+      - "content_sim"
+    
+    # Edge update parameters (Equation 2)
+    edge_update_delta: 0.1
+    edge_pruning_epsilon: 0.05
+    persistent_mismatch_threshold: 3
+    
+    # Similarity edge parameters (Equations 3, 5)
+    user_similarity_threshold: 0.7
+    item_similarity_threshold: 0.6
+    co_interaction_threshold: 3
+    
+    # Dynamic graph parameters (Section 3.3.2)
+    recompute_threshold: 0.15  # θ_recompute
+    ppr_restart_prob: 0.15
+    max_hops: 2
+  
+  # --------------------------------------------------------------------------
+  # GNN Configuration (Section 3.6 - Component-Disentangled Distillation)
+  # --------------------------------------------------------------------------
+  gnn:
+    hidden_dim: 256
+    num_layers: 3
+    num_heads: 4
+    dropout: 0.1
+    activation: "relu"
+    
+    # Component-specific projection heads (Equations 11-13)
+    projection_heads:
+      intrinsic_dim: 256
+      collaborative_dim: 256
+      interaction_dim: 256
+    
+    # GNN architecture
+    use_attention: true
+    attention_heads: 4
+    message_dropout: 0.1
+    
+    # Training
+    learning_rate: 0.0001
+    weight_decay: 0.00001
+  
+  # --------------------------------------------------------------------------
+  # Distillation Configuration (Section 3.6 - Component-Disentangled KD)
+  # --------------------------------------------------------------------------
+  distillation:
+    # Component weights (Equation 14)
+    component_weights: [1.0, 1.0, 1.0]
+    
+    # Loss coefficients (Equation 14)
+    alpha: 0.5  # Path importance loss coefficient
+    beta: 0.3   # Contrastive loss coefficient
+    gamma: 0.2  # Reconstruction loss coefficient
+    
+    # Temperature for contrastive loss (Equation 15)
+    temperature: 0.07
+    
+    # Distillation parameters
+    enabled: true
+    num_epochs: 30
+    batch_size: 64
+    learning_rate: 0.0001
+    
+    # Loss components
+    component_wise_weight: 1.0
+    path_importance_weight: 0.5
+    contrastive_weight: 0.3
+    reconstruction_weight: 0.2
+    
+    # Alignment
+    representation_alignment: true
+    memory_dynamics_transfer: true
+    
+    # Path importance
+    path_importance_enabled: true
+    path_importance_kl_weight: 0.5
+  
+  # --------------------------------------------------------------------------
+  # Graph RAG Configuration (Section 3.4 - Multi-Hop Graph RAG Retrieval)
+  # --------------------------------------------------------------------------
+  graph_rag:
+    # Retrieval parameters
+    enabled: true
+    max_hops: 2  # k from paper
+    metapath_extraction: true
+    
+    # Metapath types (as per paper Section 3.4)
+    metapath_types:
+      - "user_item_user"     # u -> i_shared -> u_similar
+      - "user_user_item"     # u -> u_similar -> i_candidate
+      - "item_item_analogy"  # i_candidate -> i_similar -> i_history
+    
+    # PPR sampling (Equation 9)
+    ppr_sampling: true
+    restart_prob: 0.15
+    easy_threshold: 10  # T_easy from paper
+    hard_threshold: 10  # T_hard from paper
+    
+    # Context construction
+    context_size: 50
+    include_relation_descriptions: true
+    
+    # Retrieval weights
+    semantic_weight: 0.5
+    collaborative_weight: 0.5
+  
+  # --------------------------------------------------------------------------
+  # Hybrid Configuration (Section 3.7 - Adaptive Gating)
+  # --------------------------------------------------------------------------
+  hybrid:
+    # Gate parameters (Equation 16)
+    gate_threshold: 0.3  # η from paper
+    gate_enabled: true
+    use_hybrid: true
+    
+    # Gating features (Equation 16)
+    staleness_lambda: 0.1
+    uniform_llm_rate: 0.15
+    
+    # Feature weights for gating (w from Equation 16)
+    gate_weights:
+      confidence: 1.0
+      density: 0.8
+      criticality: 1.2
+      staleness: 0.6
+    
+    # Gating bias (b from Equation 16)
+    gate_bias: -0.5
+    
+    # Quality-efficiency tradeoff
+    quality_weight: 0.7
+    efficiency_weight: 0.3
+    
+    # Inference parameters
+    inference_batch_size: 32
+    max_llm_calls_per_batch: 10
+    
+    # Routing
+    gnn_path_enabled: true
+    llm_path_enabled: true
+    
+    # Threshold ranges for optimization
+    threshold_min: 0.0
+    threshold_max: 1.0
+    threshold_step: 0.05
+
+# ----------------------------------------------------------------------------
+# LLM Configuration
+# ----------------------------------------------------------------------------
+llm:
+  # Model selection
+  model_name: "gpt-3.5-turbo"  # As used in paper
+  embedding_model: "text-embedding-ada-002"  # As used in paper
+  
+  # Generation parameters
+  temperature: 0.7
+  max_tokens: 512
+  top_p: 0.9
+  frequency_penalty: 0.0
+  presence_penalty: 0.0
+  
+  # API configuration
+  api_base: "https://api.openai.com/v1"
+  max_retries: 3
+  timeout: 30
+  
+  # Prompt templates (as per paper Section 3.5)
+  prompt_templates:
+    reflection: |
+      You are a {agent_type} agent in a recommender system.
+      Given the following context and interaction outcome, reflect on your memory.
+      Context: {context}
+      Outcome: {outcome}
+      Provide an explanation and update your memory accordingly.
+    
+    fusion: |
+      You are fusing collaborative memories from multiple agents.
+      Memories: {memories}
+      Instruction: {instruction}
+      Generate a unified collaborative memory.
+    
+    ranking: |
+      You are ranking items for user: {user}
+      Candidate items: {candidates}
+      Context: {context}
+      Rank the items by relevance.
+    
+    explanation: |
+      Provide an explanation for recommending item {item} to user {user}.
+      Context: {context}
+    
+    summarization: |
+      Summarize the following text in {max_length} words or less:
+      {text}
+    
+    metapath_verbalization: |
+      Describe the relationship path: {path}
+      Relation types: {relations}
+    
+    system_reflection: |
+      You are a collaborative reflection engine for a recommender system.
+      Analyze the interaction and provide insights.
+    
+    system_fusion: |
+      You are a memory fusion engine for a recommender system.
+      Combine multiple memories into a coherent representation.
+    
+    system_ranking: |
+      You are a ranking expert for a recommender system.
+      Rank items based on user preferences and context.
+
+# ----------------------------------------------------------------------------
+# Training Configuration
+# ----------------------------------------------------------------------------
+training:
+  # --------------------------------------------------------------------------
+  # Phase 1: Bootstrap (Section 3.5 - Collaborative Reflection)
+  # --------------------------------------------------------------------------
+  phase1:
+    num_epochs: 50
+    batch_size: 32
+    learning_rate: 0.0001
+    easy_threshold: 10  # T_easy from paper
+    hard_threshold: 10  # T_hard from paper
+    
+    # Reflection parameters
+    reflection_interval: 5
+    propagation_signal_threshold: 0.15  # θ_propagate
+    
+    # Optimization
+    optimizer: "adam"
+    weight_decay: 0.00001
+    gradient_clip: 1.0
+    
+    # Checkpointing
+    save_interval: 5
+    early_stopping_patience: 10
+    early_stopping_threshold: 0.001
+    
+    # Data
+    num_users: 500  # For bootstrap phase (as per paper)
+    
+    # Memory updates
+    memory_update_frequency: 1
+    neighbor_propagation: true
+  
+  # --------------------------------------------------------------------------
+  # Phase 2: Distillation (Section 3.6 - Component-Disentangled KD)
+  # --------------------------------------------------------------------------
+  phase2:
+    num_epochs: 30
+    batch_size: 64
+    learning_rate: 0.0001
+    
+    # Optimization
+    optimizer: "adam"
+    weight_decay: 0.00001
+    gradient_clip: 1.0
+    
+    # Loss weights
+    component_loss_weight: 1.0
+    path_loss_weight: 0.5
+    contrast_loss_weight: 0.3
+    recon_loss_weight: 0.2
+    
+    # Checkpointing
+    save_interval: 5
+    early_stopping_patience: 10
+    early_stopping_threshold: 0.001
+    
+    # Distillation
+    teacher_temperature: 1.0
+    student_temperature: 0.07  # τ from paper
+    
+    # Alignment
+    alignment_iterations: 10
+    alignment_lr: 0.001
+  
+  # --------------------------------------------------------------------------
+  # Phase 3: Hybrid (Section 3.7 - Adaptive Gating)
+  # --------------------------------------------------------------------------
+  phase3:
+    num_epochs: 20
+    batch_size: 32
+    learning_rate: 0.00005
+    
+    # Optimization
+    optimizer: "adam"
+    weight_decay: 0.00001
+    gradient_clip: 1.0
+    
+    # Checkpointing
+    save_interval: 5
+    early_stopping_patience: 10
+    early_stopping_threshold: 0.001
+    
+    # Gate training
+    gate_learning_rate: 0.001
+    gate_optimizer: "adam"
+    threshold_optimization_steps: 100
+    
+    # Inference
+    inference_batch_size: 32
+    gnn_threshold: 0.3  # η from paper
+    uniform_llm_rate: 0.15  # For baseline comparison
+
+# ----------------------------------------------------------------------------
+# Evaluation Configuration
+# ----------------------------------------------------------------------------
+evaluation:
+  # Metrics (as per paper Section 3.8)
+  metrics:
+    - "ndcg"
+    - "hit_rate"
+    - "recall"
+    - "precision"
+    - "mrr"
+  
+  # K values for ranking metrics (as per paper)
+  k_values: [1, 5, 10]
+  
+  # Evaluation protocol (leave-one-out as per paper)
+  num_negatives: 99  # As per paper
+  num_repetitions: 3  # As per paper
+  
+  # Seed for reproducibility
+  seed: 42
+  
+  # Efficiency metrics (as per paper Section 3.8)
+  llm_call_ratio: true
+  cost_savings: true
+  inference_time: true
+  memory_usage: true
+  
+  # Additional evaluations
+  run_ablation: true
+  run_cold_start: true
+  run_efficiency: true
+  
+  # Reporting
+  save_predictions: true
+  generate_report: true
+  report_format: ["json", "csv", "html"]
+  
+  # Baseline models to compare against (as per paper Section 3.9)
+  baselines:
+    - "BPR"
+    - "SASRec"
+    - "LightGCN"
+    - "LLMRank"
+    - "GraphPrompt"
+    - "AgentCF"
+    - "GraphRAG-Base"
+    - "GraphRAG-Emb"
+    - "GraphRAG-Hybrid"
+
+# ----------------------------------------------------------------------------
+# Ablation Configuration (Section 4.3)
+# ----------------------------------------------------------------------------
+ablation:
+  variants:
+    - "hierarchical_memory"
+    - "graph_rag"
+    - "metapath_hops"
+    - "contrastive_loss"
+    - "path_importance_loss"
+    - "adaptive_gating"
+    - "collaborative_memory"
+    - "reflection_engine"
+    - "gnn_distillation"
+  
+  run_baseline: true
+  parallel: true
+  max_workers: 4
+  
+  # Combined ablations
+  combined_ablations: true
+  max_combinations: 10
+
+# ----------------------------------------------------------------------------
+# Cold-Start Configuration (Section 4.4)
+# ----------------------------------------------------------------------------
+cold_start:
+  scenarios:
+    - "zero_shot"
+    - "few_shot_1"
+    - "few_shot_3"
+    - "few_shot_5"
+    - "few_shot_10"
+  
+  num_users: 100
+  num_items: 100
+  use_pretrained: true
+  cross_domain: false
+  
+  # Interaction thresholds for analysis
+  low_interaction_threshold: 5
+  high_interaction_threshold: 10
+
+# ----------------------------------------------------------------------------
+# Efficiency Configuration (Section 4.2)
+# ----------------------------------------------------------------------------
+efficiency:
+  batch_sizes: [1, 4, 8, 16, 32, 64, 128]
+  num_requests: 1000
+  warmup_requests: 100
+  llm_call_ratios: [0.0, 0.1, 0.25, 0.5, 0.75, 1.0]
+  
+  track_gpu: true
+  track_memory: true
+  track_cpu: true
+  
+  cost_model:
+    llm_cost_per_1k_tokens: 0.002  # GPT-3.5-turbo cost
+    gnn_cost_per_request: 0.0001
+
+# ----------------------------------------------------------------------------
+# Visualization Configuration
+# ----------------------------------------------------------------------------
+visualization:
+  output_dir: "plots"
+  dpi: 300
+  style: "seaborn-v0_8-darkgrid"
+  interactive: false
+  figsize: [12, 8]
+  formats: ["png", "pdf", "html"]
+  save_reports: true
+
+# ----------------------------------------------------------------------------
+# Logging Configuration
+# ----------------------------------------------------------------------------
+logging:
+  log_dir: "logs"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  verbose: true
+  structured_logging: true
+  log_level: "INFO"
+  
+  # Log components
+  log_training: true
+  log_evaluation: true
+  log_memory: true
+  log_graph: true
+  log_gating: true
+
+# ----------------------------------------------------------------------------
+# Memory Configuration (Section 3.2)
+# ----------------------------------------------------------------------------
+memory:
+  # Agent memory settings
+  intrinsic:
+    immutable: true
+    max_size: 1024
+    embedding_dim: 1536
+  
+  collaborative:
+    max_neighbors: 50
+    aggregation_method: "weighted_average"
+    propagation_hop: 2
+  
+  interaction:
+    buffer_size: 10
+    max_traces: 100
+    trace_retention: 1000  # Steps to retain traces
+  
+  consistency:
+    check_frequency: 10
+    threshold: 0.15  # θ_recompute
+    min_similarity: 0.5
+
+# ----------------------------------------------------------------------------
+# Graph RAG Retrieval Configuration (Section 3.4)
+# ----------------------------------------------------------------------------
+retrieval:
+  # Multi-hop parameters
+  max_hops: 2  # k from paper
+  hop_expansion: 2
+  top_k_neighbors: 50
+  
+  # Metapath parameters
+  metapath_types:
+    - ["user", "item", "user"]
+    - ["user", "user", "item"]
+    - ["item", "item", "item"]
+  
+  # PPR sampling parameters (Equation 9)
+  ppr_restart_prob: 0.15
+  ppr_iterations: 100
+  ppr_tolerance: 0.001
+  
+  # Context construction
+  context_max_length: 1024
+  include_metadata: true
+  include_explanations: true
+  
+  # Node ranking
+  ranking_method: "ppr"  # "ppr" or "heuristic"
+  ranking_weights:
+    semantic: 0.5
+    collaborative: 0.5
+
+# ----------------------------------------------------------------------------
+# GNN Configuration (Section 3.6)
+# ----------------------------------------------------------------------------
+gnn:
+  # Architecture
+  hidden_dim: 256
+  num_layers: 3
+  num_heads: 4
+  dropout: 0.1
+  activation: "relu"
+  
+  # Message passing
+  message_dropout: 0.1
+  edge_dropout: 0.1
+  node_dropout: 0.1
+  
+  # Component projection heads (Equations 11-13)
+  projection_heads:
+    intrinsic:
+      dim: 256
+      activation: "tanh"
+    collaborative:
+      dim: 256
+      activation: "tanh"
+    interaction:
+      dim: 256
+      activation: "tanh"
+  
+  # Attention
+  attention_heads: 4
+  attention_dim: 64
+  
+  # Training
+  learning_rate: 0.0001
+  weight_decay: 0.00001
+  optimizer: "adam"
+  
+  # Normalization
+  norm_type: "batch_norm"
+  norm_momentum: 0.1
+
+# ----------------------------------------------------------------------------
+# Device and Performance Configuration
+# ----------------------------------------------------------------------------
+device:
+  type: "cuda"  # "cuda" or "cpu"
+  gpu_id: 0
+  cudnn_deterministic: true
+  cudnn_benchmark: false
+  
+performance:
+  use_amp: false  # Automatic Mixed Precision
+  compile_model: false  # Torch compile
+  pin_memory: true
+  num_workers: 4
+  prefetch_factor: 2
+
+# ----------------------------------------------------------------------------
+# Seed Management Configuration
+# ----------------------------------------------------------------------------
+seed_manager:
+  deterministic_algorithms: true
+  log_seed_usage: true
+  use_environment_seed: true
+  seed: 42
+
+# ----------------------------------------------------------------------------
+# Model Checkpointing Configuration
+# ----------------------------------------------------------------------------
+checkpoints:
+  save_dir: "checkpoints"
+  max_checkpoints: 10
+  save_best: true
+  save_last: true
+  save_interval: 5
+  checkpoint_format: "pt"  # "pt" or "pkl"
+  
+  # Resuming
+  resume_training: false
+  resume_path: ""
+  
+  # Model export
+  export_format: ["pt", "onnx"]
+  export_quantization: false
+
+# ============================================================================
+# End of Configuration
+# ============================================================================

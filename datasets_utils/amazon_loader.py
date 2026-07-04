@@ -146,7 +146,7 @@ class AmazonDataLoader:
                         'summary': record.get('summary', ''),
                         'unixReviewTime': int(record.get('unixReviewTime', 0)),
                         'verified': record.get('verified', False),
-                        'vote': int(record.get('vote', 0) if record.get('vote') else 0),
+                        'vote': int(record.get('vote', 0).replace(',', "") if record.get('vote') else 0),
                         'reviewerName': record.get('reviewerName', ''),
                         'style': record.get('style', {})
                     })
@@ -160,7 +160,25 @@ class AmazonDataLoader:
         if 'unixReviewTime' in df.columns:
             df = df.sort_values('unixReviewTime')
         
-        return df
+        # print(df.head())
+        # df = df.set_index('reviewerID')
+        # print(df.head())
+        # df = df.groupby(by='reviewerID').agg(lambda x: x.values.tolist())
+        # print(df.head())
+        # df = df.T
+        # print(df.head())
+        
+        
+        # user_data_dict = df.to_dict('dict')
+
+        # index = 0
+        # for key in user_data_dict:
+        #     index += 1
+        #     print(f"{key} | {user_data_dict[key]}")
+        #     if index > 1:
+        #         break
+
+        return df # user_data_dict
     
     def load_metadata(self, 
                       item_ids: Optional[List[str]] = None) -> Dict[str, Dict]:

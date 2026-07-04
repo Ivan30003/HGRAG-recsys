@@ -617,10 +617,6 @@ Output format:
 Revised advertisement: [Your revised advertisement here]
 """
     
-    # ============================================
-    # Template Formatting Methods
-    # ============================================
-    
     def get_user_summary_prompt(self, user_data: Dict) -> str:
         """Format user summary prompt."""
         template = self._templates['user_summary']

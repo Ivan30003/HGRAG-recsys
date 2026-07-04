@@ -47,42 +47,42 @@ pip install -r requirements.txt
 
 **Experiments**
 bash```
-# 1. Data Preparation
+## 1. Data Preparation
 python scripts/preprocess_data.py --dataset "Amazon_CDs_Vinyl"
 
-# 2. Phase 1: Bootstrap
+## 2. Phase 1: Bootstrap
 python scripts/train_phase1.py
 
-# 3. Phase 2: Distillation
+## 3. Phase 2: Distillation
 python scripts/train_phase2.py --teacher-path experiments/phase1/checkpoints/phase1_best.pt
 
-# 4. Phase 3: Hybrid
+## 4. Phase 3: Hybrid
 python scripts/train_phase3.py --gnn-path experiments/phase2/checkpoints/distilled_model.pt --llm-path experiments/phase1/checkpoints/phase1_best.pt
 
-# 5. Evaluation
+## 5. Evaluation
 python scripts/evaluate_model.py --model-path experiments/phase3/checkpoints/phase3_best.pt
 
-# 6. Ablation Study
+## 6. Ablation Study
 python scripts/run_ablation.py --model-path experiments/phase3/checkpoints/phase3_best.pt
 
 
-# 7. Run efficiency experiment
+## 7. Run efficiency experiment
 python experiments/efficiency_experiment.py --config config/default_config.yaml \
     --gnn-path experiments/phase2/checkpoints/distilled_model.pt \
     --llm-path experiments/phase1/checkpoints/phase1_best.pt
 
-# Custom batch sizes
+## Custom batch sizes
 python experiments/efficiency_experiment.py --config config/default_config.yaml \
     --batch-sizes "1,4,8,16,32,64,128"
 
-# Custom LLM call ratios
+## Custom LLM call ratios
 python experiments/efficiency_experiment.py --config config/default_config.yaml \
     --llm-ratios "0.0,0.25,0.5,0.75,1.0"
 
-# Increase request count for better statistics
+## Increase request count for better statistics
 python experiments/efficiency_experiment.py --config config/default_config.yaml \
     --num-requests 10000 --warmup-requests 200
 
-# Disable GPU/memory tracking
+## Disable GPU/memory tracking
 python experiments/efficiency_experiment.py --config config/default_config.yaml \
     --no-gpu --no-memory

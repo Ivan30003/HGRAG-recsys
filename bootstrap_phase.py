@@ -11,12 +11,13 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 import numpy as np
+from tqdm import tqdm
 
 from agents_utils.user_agent import UserAgent
 from agents_utils.item_agent import ItemAgent
 from graph_utils.heterogeneous_graph import HeterogeneousGraph
 from graph_utils.metapath_extractor import MetapathExtractor
-from llm_utils.llm_client import LLMClient
+from llm_utils.llm_client import LLMClient, get_llm_client
 from llm_utils.embedding_client import EmbeddingClient
 from prompt_utils.prompts import PromptTemplates
 from prompt_utils.context_builder import ContextBuilder
@@ -47,7 +48,7 @@ class BootstrapPhase:
         self.bootstrap_config = config['bootstrap']
         
         # Initialize components
-        self.llm_client = LLMClient()
+        self.llm_client = get_llm_client(self.config)
         self.embedding_client = EmbeddingClient()
         self.prompt_templates = PromptTemplates()
         self.context_builder = ContextBuilder()
@@ -77,7 +78,7 @@ class BootstrapPhase:
             items_data: Dictionary of item_id -> item features
         """
         logger.info(f"Initializing {len(users_data)} user agents...")
-        for user_id, user_data in users_data.items():
+        for user_id, user_data in tqdm(users_data.items()):
             intrinsic_memory = create_intrinsic_memory_from_user(user_data, user_id)
             intrinsic_memory.summary_text = self._generate_user_summary(user_data)
             
@@ -111,17 +112,23 @@ class BootstrapPhase:
     def _generate_user_summary(self, user_data: Dict) -> str:
         """Generate summary text for user intrinsic memory."""
         prompt = self.prompt_templates.get_user_summary_prompt(user_data)
-        response = self.llm_client.generate(prompt, max_tokens=100)
+        response = self.llm_client.generate(prompt, max_new_tokens=100)
         self.stats['llm_calls'] += 1
-        self.stats['total_cost'] += response.cost_estimate
+        if getattr(response, 'cost_estimate', None):
+            self.stats['total_cost'] += response.cost_estimate
+        else:
+            self.stats['total_cost'] += 0
         return response.text
     
     def _generate_item_summary(self, item_data: Dict) -> str:
         """Generate summary text for item intrinsic memory."""
         prompt = self.prompt_templates.get_item_summary_prompt(item_data)
-        response = self.llm_client.generate(prompt, max_tokens=100)
+        response = self.llm_client.generate(prompt, max_new_tokens=100)
         self.stats['llm_calls'] += 1
-        self.stats['total_cost'] += response.cost_estimate
+        if getattr(response, 'cost_estimate', None):
+            self.stats['total_cost'] += response.cost_estimate
+        else:
+            self.stats['total_cost'] += 0
         return response.text
     
     def construct_graph(self):
@@ -342,10 +349,10 @@ class BootstrapPhase:
         self.construct_graph()
         
         # Process interactions
-        for step in range(max_steps):
+        for step in tqdm(range(max_steps)):
             logger.info(f"Optimization step {step + 1}/{max_steps}")
             
-            for user_id, item_id in interactions[:100]:  # Limit for demo
+            for user_id, item_id in interactions:  # [:100]  Limit for demo
                 # Sample negative
                 negative_id = self._sample_negative(user_id, item_id)
                 
@@ -398,25 +405,31 @@ def main():
         config = yaml.safe_load(f)
     
     # Load data (mock for demo)
-    users_data = {
-        f'user_{i}': {'preferences': ['rock', 'jazz'], 'constraints': []}
-        for i in range(config['bootstrap']['num_users'])
-    }
+    data_loader = AmazonDataLoader(config["dataset"]["path"])
+
+    reviews, users_stats, connected_items = data_loader.load_subset(num_users=50)
+
+    # users_data = data_loader.load_reviews()
+    # items_data = data_loader.load_metadata()
     
-    items_data = {
-        f'item_{i}': {
-            'title': f'Product {i}',
-            'category': np.random.choice(['Books', 'Music', 'Electronics']),
-            'description': f'Description for item {i}'
-        }
-        for i in range(100)
-    }
+    print(f"")
     
-    interactions = [(f'user_{i}', f'item_{i % 100}') for i in range(500)]
+    # items_data = {
+    #     f'item_{i}': {
+    #         'title': f'Product {i}',
+    #         'category': np.random.choice(['Books', 'Music', 'Electronics']),
+    #         'description': f'Description for item {i}'
+    #     }
+    #     for i in range(100)
+    # }
     
+    # interactions = [(f'user_{i}', f'item_{i % 100}') for i in range(500)]
+    
+
+
     # Run bootstrap phase
     bootstrap = BootstrapPhase(config)
-    results = bootstrap.run(users_data, items_data, interactions)
+    results = bootstrap.run(reviews, connected_items, interactions=)
     
     # Save results
     output_dir = Path(config['output']['save_dir'])

@@ -1,10 +1,8 @@
-# Hybrid-GraphRAG Experiment Configuration
-
 experiment:
   name: "hybrid_graphrag_amazon"
   version: "1.0.0"
-  seed: 42
-  device: "cuda"  # or "cpu"
+  seed: 4720
+  device: "cuda"  #"cpu"
 
 # Phase 1: Bootstrap Configuration
 bootstrap:
@@ -14,15 +12,13 @@ bootstrap:
   max_reflection_iterations: 2
   lazy_propagation_threshold: 0.3
   
-  # Graph construction
   graph:
     similarity_threshold_user: 0.7
     similarity_threshold_item: 0.6
     co_interaction_min_shared: 3
     edge_prune_threshold: 0.05
     edge_update_delta: 0.1
-    
-  # Memory configuration
+
   memory:
     max_interaction_buffer: 10
     decay_lambda: 0.1
@@ -89,6 +85,7 @@ inference:
 
 # LLM Configuration
 llm:
+  path: "/media/hdd/models/text/Qwen3-4B-Instruct-2507/"
   api_key_env: "OPENAI_API_KEY"
   default_model: "gpt-3.5-turbo-16k"
   embedding_model: "text-embedding-ada-002"
@@ -99,34 +96,30 @@ llm:
     reflection: "gpt-3.5-turbo-16k"
     simple_choice: "text-davinci-003"
     
-  # Generation parameters
   generation:
     temperature: 0.3
     max_tokens_decision: 500
     max_tokens_reflection: 2000
 
-# Dataset Configuration
 dataset:
   name: "amazon_reviews"
+  path: "/home/person/projects/doc_rec_sys/datasets/cd_and_vinyl"
   domains:
     - "CDs_and_Vinyl"
     - "Office_Products"
   
-  # Subsampling
   subsample:
     phase1_users: 500
     phase3_users: 100
     min_interactions: 5
     max_interactions: 50
   
-  # Preprocessing
   preprocessing:
     max_description_length: 100
     remove_html: true
     normalize_whitespace: true
     min_word_count: 3
 
-# Evaluation Configuration
 evaluation:
   metrics:
     - "ndcg"

@@ -1,15 +1,14 @@
 #!/bin/bash
 
 # Hybrid-GraphRAG Experiment Runner
-# =====================================
 
 set -e  # Exit on error
 
 # Configuration
-CONFIG_FILE="experiment_launch_confg.yaml"
+CONFIG_FILE="experiment_launch_config.yaml"
 LOG_DIR="./logs"
 RESULTS_DIR="./results"
-PYTHON="python3"
+PYTHON="/home/person/projects/venvs/conda_graphrag/bin/python"
 
 # Colors for output
 RED='\033[0;31m'
@@ -29,7 +28,7 @@ mkdir -p ${RESULTS_DIR}
 # Check for OpenAI API key
 if [ -z "${OPENAI_API_KEY}" ]; then
     echo -e "${YELLOW}Warning: OPENAI_API_KEY not set. LLM calls will fail.${NC}"
-    echo -e "${YELLOW}Set it with: export OPENAI_API_KEY='your-key-here'${NC}"
+    echo -e "${YELLOW}Set it with: export OPENAI_API_KEY=<your-key-here>${NC}"
 fi
 
 # Function to run a phase with timing
@@ -41,7 +40,9 @@ run_phase() {
     echo -e "\n${GREEN}[$(date '+%H:%M:%S')] Starting ${phase_name}...${NC}"
     
     start_time=$(date +%s)
-    
+
+    echo "${log_file}"
+
     ${PYTHON} ${script} --config ${CONFIG_FILE} 2>&1 | tee ${log_file}
     
     exit_code=${PIPESTATUS[0]}
@@ -56,24 +57,16 @@ run_phase() {
     fi
 }
 
-# ============================================
 # Phase 1: Bootstrap
-# ============================================
-run_phase "Phase 1: Bootstrap" "bootstrap_phase.py"
+run_phase "Bootstrap" "bootstrap_phase.py"
 
-# ============================================
 # Phase 2: GNN Training (Distillation)
-# ============================================
-run_phase "Phase 2: GNN Distillation" "gnn_train_phase.py"
+run_phase "GNN_Distillation" "gnn_train_phase.py"
 
-# ============================================
 # Phase 3: Hybrid Inference
-# ============================================
-run_phase "Phase 3: Hybrid Inference" "hybrid_inference_phase.py"
+run_phase "Phase_3: Hybrid Inference" "hybrid_inference_phase.py"
 
-# ============================================
 # Generate Summary Report
-# ============================================
 echo -e "\n${BLUE}========================================${NC}"
 echo -e "${BLUE}  Generating Summary Report              ${NC}"
 echo -e "${BLUE}========================================${NC}"
